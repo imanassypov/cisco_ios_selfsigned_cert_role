@@ -1,0 +1,60 @@
+##
+## Validation
+## openssl pkcs12 -info -in certs/c9200.example.com.pfx -passin pass:"Cisco123"
+---
+# tasks file for dynamic_motd
+- name: Cert path creation
+  ansible.builtin.file:
+    path: "{{ cert_path }}"
+    mode: '777'
+    state: directory
+
+- name: "Generate the private key for self-signed cert"
+  community.crypto.openssl_privatekey:
+    path: "{{ cert_path }}{{ inventory_hostname }}.pem"
+    passphrase: "{{ private_key_password }}"
+    cipher: auto
+
+- name: Generate a Self-Signed OpenSSL Certificate
+  ansible.builtin.command: >
+    openssl req -x509 -new -nodes -key "{{ cert_path }}{{ inventory_hostname }}.pem" -sha1 -days 3650
+    -out "{{ cert_path }}{{ inventory_hostname }}.crt" -subj "/CN={{ inventory_hostname }}"
+    -passin pass:"{{ private_key_password }}"
+  args:
+    creates: "{{ cert_path }}{{ inventory_hostname }}.crt"
+
+- name: Convert the certificate and private key to PFX format with SHA-1
+  ansible.builtin.command: >
+    openssl pkcs12 -export -out "{{ cert_path }}{{ inventory_hostname }}.pfx" -inkey "{{ cert_path }}{{ inventory_hostname }}.pem"
+    -in "{{ cert_path }}{{ inventory_hostname }}.crt" -passin pass:"{{ private_key_password }}" -passout pass:"{{ pkcs12_password }}" -macalg sha1 -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES
+  args:
+    creates: "{{ cert_path }}{{ inventory_hostname }}.pfx"
+
+- name: Copy pfx cert to device
+  ansible.netcommon.net_put:
+    src: "{{ cert_path }}{{ inventory_hostname }}.pfx"
+    dest: "flash:/{{ inventory_hostname }}.pfx"
+
+- name: Create trustpoint "{{trustpoint_name}}"
+  cisco.ios.ios_config:
+      lines:
+        - revocation-check none
+      parents: crypto pki trustpoint {{ trustpoint_name }}
+
+- name: Import PKCS12 pfx into trustpoint
+  cisco.ios.ios_command:
+    commands:
+      - crypto pki import TEST pkcs12 bootflash:{{ inventory_hostname }}.pfx password {{ pkcs12_password }}
+
+- name: Trustpoint status collection
+  cisco.ios.ios_command:
+    commands:
+      - show crypto pki trustpoint {{ trustpoint_name }} status
+  register: trustpoint_status
+
+- name: Asserting trustpoint status
+  assert:
+    that:
+      - "'Issuing CA certificate not configured' not in trustpoint_status.stdout[0]"
+    success_msg: "Passed: Issuing CA certificate configured"
+    fail_msg: "Failed: Issuing CA certificate not configured"

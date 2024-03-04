@@ -1,0 +1,7 @@
+---
+# defaults file for self_signed_cert
+cert_path: "./certs/"
+private_key_password: Cisco123
+pkcs12_password: Cisco123
+pkcs12_mac: sha1 #default is sha256, https://bst.cisco.com/bugsearch/bug/CSCvz41428
+trustpoint_name: TEST

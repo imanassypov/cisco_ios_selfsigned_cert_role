@@ -1,0 +1,7 @@
+- name: Generate self-signed certs for each host
+  hosts: 
+    - switches
+    - routers
+  gather_facts: no
+  roles:
+    - self_signed_cert
