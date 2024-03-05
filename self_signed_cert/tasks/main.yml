@@ -41,10 +41,20 @@
         - revocation-check none
       parents: crypto pki trustpoint {{ trustpoint_name }}
 
+- name: Suppress IOS file prompts
+  cisco.ios.ios_config:
+      lines:
+        - file prompt quiet
+
+# - name: Import PKCS12 pfx into trustpoint
+#   cisco.ios.ios_command:
+#     commands:
+#       - crypto pki import {{ trustpoint_name }} pkcs12 bootflash:{{ inventory_hostname }}.pfx password {{ pkcs12_password }}
+
 - name: Import PKCS12 pfx into trustpoint
-  cisco.ios.ios_command:
-    commands:
-      - crypto pki import TEST pkcs12 bootflash:{{ inventory_hostname }}.pfx password {{ pkcs12_password }}
+  cisco.ios.ios_config:
+    lines:
+      - crypto pki import {{ trustpoint_name }} pkcs12 bootflash:{{ inventory_hostname }}.pfx password {{ pkcs12_password }}
 
 - name: Trustpoint status collection
   cisco.ios.ios_command:
